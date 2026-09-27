@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.bancoxyz</groupId>
+    <artifactId>banco-xyz-microservicios</artifactId>
+    <version>1.0.0</version>
+    <packaging>pom</packaging>
+    <name>Banco XYZ - Microservicios</name>
+    <description>Migracion de datos legacy y arquitectura de microservicios con Spring Cloud</description>
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.3.13</version>
+        <relativePath/>
+    </parent>
+
+    <properties>
+        <java.version>17</java.version>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <spring-cloud.version>2023.0.6</spring-cloud.version>
+        <resilience4j.version>2.4.0</resilience4j.version>
+        <jjwt.version>0.13.0</jjwt.version>
+        <rxjava2.version>2.2.21</rxjava2.version>
+        <rxjava3.version>3.1.8</rxjava3.version>
+    </properties>
+
+    <modules>
+        <module>common-lib</module>
+        <module>config-server</module>
+        <module>discovery-server</module>
+        <module>auth-service</module>
+        <module>transacciones-service</module>
+        <module>intereses-service</module>
+        <module>cuentas-service</module>
+    </modules>
+
+    <dependencyManagement>
+        <dependencies>
+            <!-- Se importa ANTES que spring-cloud-dependencies: Maven usa la primera
+                 declaracion de dependencyManagement cuando varios BOMs pinean el mismo
+                 artefacto. spring-cloud-dependencies 2023.0.x fija los modulos de
+                 resilience4j (annotations, core, circuitbreaker, retry, spring6, ...) en
+                 2.2.0, una version mas vieja e incompatible con resilience4j-spring-boot3
+                 2.4.0 (NoSuchMethodError / clases de fallback reactivo faltantes).
+                 Importar este BOM primero fuerza que TODOS los modulos de resilience4j
+                 queden alineados en 2.4.0. -->
+            <dependency>
+                <groupId>io.github.resilience4j</groupId>
+                <artifactId>resilience4j-bom</artifactId>
+                <version>${resilience4j.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.springframework.cloud</groupId>
+                <artifactId>spring-cloud-dependencies</artifactId>
+                <version>${spring-cloud.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>com.bancoxyz</groupId>
+                <artifactId>common-lib</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <!-- resilience4j-spring-boot3's fallback autoconfig declares bean methods
+                 returning RxJava2/3 decorator types; Spring's reflective introspection
+                 needs those classes resolvable even though we never use reactive types. -->
+            <dependency>
+                <groupId>io.reactivex.rxjava2</groupId>
+                <artifactId>rxjava</artifactId>
+                <version>${rxjava2.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.reactivex.rxjava3</groupId>
+                <artifactId>rxjava</artifactId>
+                <version>${rxjava3.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+</project>
