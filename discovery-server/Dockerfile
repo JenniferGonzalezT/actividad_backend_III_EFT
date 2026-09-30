@@ -1,5 +1,5 @@
 # Imagen ligera de Java 17
-FROM eclipse-temurin:17-jdk-alpine
+FROM eclipse-temurin:17-jdk-jammy
 
 # Directorio de trabajo dentro del contenedor
 WORKDIR /app
