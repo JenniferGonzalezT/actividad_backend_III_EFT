@@ -15,7 +15,6 @@ import org.springframework.web.server.ResponseStatusException;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Set;
-import java.util.UUID;
 
 @Service
 public class TransaccionService {
@@ -66,7 +65,10 @@ public class TransaccionService {
     }
 
     private boolean publicar(Transaccion t) {
-        String id = UUID.randomUUID().toString();
+        // Conservamos el identificador original del evento usando el ID de la transacción 
+        // en lugar de UUID.randomUUID() para garantizar la idempotencia en los consumidores.
+        String id = "TXN-" + t.getId();
+        
         try {
             return publisher.publicar(new TransaccionRegistradaEvent(id, id, Instant.now(), t.getId(),
                     t.getCuentaId(), t.getTipo(), t.getMonto(), String.valueOf(t.getFecha())));
