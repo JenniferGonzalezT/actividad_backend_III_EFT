@@ -17,6 +17,10 @@ spring:
   h2:
     console:
       enabled: true
+  cloud:
+    openfeign:
+      circuitbreaker:
+        enabled: true
 
 feign:
   client:
