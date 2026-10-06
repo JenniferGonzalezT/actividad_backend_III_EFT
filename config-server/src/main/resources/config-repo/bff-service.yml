@@ -1,5 +1,6 @@
 server:
   port: 8085
 
-jwt:
-  secret: "banco-xyz-secreto-compartido-hs256-actividad-backend-3-no-usar-en-produccion"
+app:
+  jwt:
+    secret: "banco-xyz-secreto-compartido-hs256-actividad-backend-3-no-usar-en-produccion"
