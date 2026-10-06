@@ -17,6 +17,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.core.task.TaskExecutor;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 @Configuration
 public class CuentaAnualBatchConfig {
@@ -67,12 +69,8 @@ public class CuentaAnualBatchConfig {
                                           CuentaAnualItemProcessor cuentaAnualItemProcessor,
                                           RepositoryItemWriter<CuentaAnual> cuentaAnualWriter,
                                           CuentaAnualSkipListener cuentaAnualSkipListener) {
-        // chunk(1): con chunks mayores, Spring Batch reprocesa el chunk entero fila por
-        // fila cuando una excepcion "skippable" ocurre, para aislar al culpable. Eso
-        // reinvoca el processor sobre filas ya vistas por el DuplicateGuard (stateful),
-        // marcandolas como falsos duplicados. chunk(1) elimina ese reescaneo.
         return new StepBuilder("migrarCuentasAnualesStep", jobRepository)
-                .<CuentaAnualCsvRow, CuentaAnual>chunk(1, transactionManager)
+                .<CuentaAnualCsvRow, CuentaAnual>chunk(10, transactionManager)
                 .reader(cuentaAnualReader)
                 .processor(cuentaAnualItemProcessor)
                 .writer(cuentaAnualWriter)
@@ -82,6 +80,7 @@ public class CuentaAnualBatchConfig {
                 .skip(FlatFileParseException.class)
                 .skipLimit(1000)
                 .listener(cuentaAnualSkipListener)
+                .taskExecutor(taskExecutor())
                 .build();
     }
 
@@ -93,5 +92,16 @@ public class CuentaAnualBatchConfig {
                 .start(migrarCuentasAnualesStep)
                 .listener(cuentaAnualMigracionJobListener)
                 .build();
+    }
+
+    @Bean
+    public TaskExecutor taskExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(5);
+        executor.setMaxPoolSize(10);
+        executor.setQueueCapacity(25);
+        executor.setThreadNamePrefix("Batch-Thread-");
+        executor.initialize();
+        return executor;
     }
 }
