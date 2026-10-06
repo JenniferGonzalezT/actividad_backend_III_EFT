@@ -1,58 +1,71 @@
-# Banco XYZ — Migración de Datos Legacy y Microservicios con Spring Cloud
-
-Proyecto de modernización de procesos batch y arquitectura orientada a eventos de un banco ficticio (Banco XYZ). Esta versión (Semana 8) implementa **Spring Cloud Security con OAuth 2.0 Resource Server**, despliegue orquestado con **Docker Compose** y mecanismos de tolerancia a fallos mediante **Resilience4j** y **Apache Kafka**.
+# 🏦 Banco XYZ: Modernización de Sistema Legacy a Arquitectura de Microservicios Cloud, Spring Batch y Patrón BFF
 
 
-## Arquitectura Dockerizada
+## 🚀 Descripción General del Proyecto
+Este proyecto representa la solución integral para la modernización de la plataforma tecnológica del **Banco XYZ**, migrando su infraestructura *legacy* (basada en mainframes, COBOL y scripts shell) hacia una arquitectura moderna de **microservicios distribuidos, resilientes y orientados a eventos** alojados en la nube.
 
-El ecosistema completo se levanta dentro de una red interna de Docker, donde los microservicios se descubren automáticamente mediante Eureka y validan sus tokens contra un esquema OAuth 2.0.
+La solución implementa los pilares avanzados de la ingeniería de software backend:
+1. **Migración de Procesos Batch:** Digitalización de reportes masivos (cuentas anuales, intereses mensuales y transacciones diarias) con Spring Batch, aplicando tolerancia a fallos, omisiones (*skip policies*) y **procesamiento paralelo de alto rendimiento mediante hilos (`TaskExecutor`)**.
+
+2. **Patrón Backend for Frontend (BFF):** Implementación de una capa especializada con endpoints personalizados para optimizar la entrega de datos y la seguridad en tres canales distintos: **Portal Web (con agregación de servicios)**, **App Móvil (respuestas ligeras)** y **Cajero Automático / ATM**.
+
+3. **Seguridad Distribuida:** Autenticación y autorización centralizada mediante **OAuth 2.0 y tokens JWT**, protegiendo los recursos a través de un servidor de autenticación dedicado (`auth-service`) y propagación segura de credenciales.
+
+4. **Tolerancia a Fallos y Resiliencia:** Incorporación de **Resilience4j (Circuit Breakers y Fallbacks)** en los clientes OpenFeign para evitar la propagación de errores ante caídas de servicios.
+
+5. **Arquitectura Orientada a Eventos:** Integración de **Apache Kafka** para gestionar transacciones distribuidas de forma asíncrona (Patrón Saga coreografiado).
+
+6. **Orquestación en Contenedores:** Despliegue estandarizado de todo el ecosistema mediante **Docker y Docker Compose** con controles de salud (*healthchecks*).
+
+
+## 🛠️ Stack Tecnológico
+* **Core:** Java 17, Spring Boot 3.3.13, Maven (Multi-módulo)
+
+* **Infraestructura Cloud:** Spring Cloud Config Server, Netflix Eureka (Discovery Server)
+
+* **Seguridad:** Spring Security, OAuth 2.0 Resource Server, JSON Web Tokens (JWT)
+
+* **Procesamiento Masivo:** Spring Batch, ThreadPoolTaskExecutor (Multithreading)
+
+* **Mensajería Asíncrona:** Apache Kafka, Kafka UI
+
+* **Resiliencia:** Resilience4j (Circuit Breaker, Fallbacks)
+
+* **Contenedorización:** Docker, Docker Compose
+
+
+## 📂 Estructura de Módulos Maven
+| Módulo | Puerto | Descripción Funcional |
+|---|---|---|
+| `common-lib` | — | Librería transversal que agrupa DTOs compartidos (`record`), eventos de Kafka y conversores de roles JWT. |
+| `config-server` | 8888 | Servidor de configuración centralizada (perfil *native*) para todos los microservicios. |
+| `discovery-server` | 8761 | Servidor de registro y descubrimiento de servicios (Netflix Eureka). |
+| `auth-service` | 8081 | Servidor de Autenticación que emite y valida tokens JWT (usuarios en memoria con roles `ADMIN`/`USER`). |
+| `cuentas-service` | 8084 | Gestión de cuentas, migración Batch paralelizada de `cuentas_anuales.csv` y base de datos H2 independiente. |
+| `intereses-service` | 8083 | Gestión de intereses, migración Batch paralelizada de `intereses.csv` y base de datos H2 independiente. |
+| `transacciones-service` | 8082 | Procesamiento de pagos/transacciones, migración Batch paralelizada de `transacciones.csv` y base H2. |
+| `bff-service` | 8085 | Capa **Backend for Frontend** con canales dedicados: Web (agregación cross-service de cuentas, intereses y transacciones), Móvil y Cajero Automático (ATM). |
+
+
+## ⚙️ Arquitectura Dockerizada y Arranque
+
+El ecosistema opera dentro de una red aislada de Docker. Los microservicios descubren sus dependencias de forma dinámica a través de Eureka y obtienen sus propiedades del Config Server.
 
 ```text
  config-server (8888)        discovery-server / Eureka (8761)
-         │                            │
+         |                            |
          └──────────────┬─────────────┘
                         │  (config + registro)
-        ┌───────────────┼────────────────┬─────────────────┐
-        │               │                │                 │
-  auth-service     transacciones-   intereses-service  cuentas-service
-     (8081)        service (8082)      (8083)             (8084)
- (JWT Issuer)           │                │                 │
-                        └──► intereses ──┘                 │
-                                         └──► cuentas ─────┘
-                                                           │
-                        cuentas ──► transacciones ◄────────┘
+        ┌───────────────┼────────────────┬─────────────────┬────────────────┐
+        │               │                │                 │                │
+  auth-service     cuentas-service  intereses-service  transacciones-    bff-service
+     (8081)            (8084)           (8083)         service (8082)      (8085)
+ (JWT Issuer)          │                │                 │          (Web/Movil/ATM)
+                       └─────────────── Kafka ────────────┘
 ```
 
-- **config-server**: Spring Cloud Config Server (perfil `native`), sirve la configuración de todos los clientes desde `config-server/src/main/resources/config-repo/`.
 
-- **discovery-server**: servidor Eureka standalone para Service Discovery.
-
-- **auth-service**: emite y valida JWT (login con usuarios en memoria, roles `ADMIN`/`USER`).
-
-- **transacciones-service**, **intereses-service**, **cuentas-service**: cada uno migra su CSV correspondiente con Spring Batch, expone una API REST protegida por JWT, y llama a otro servicio vía Feign con Resilience4j (Circuit Breaker + Retry + fallback), formando un triángulo de dependencias:
-  - `transacciones-service` → `intereses-service`
-  - `intereses-service` → `cuentas-service`
-  - `cuentas-service` → `transacciones-service`
-
-- **Docker Compose** (`docker-compose.yml`): Orquesta 6 microservicios Spring Boot, 1 broker Apache Kafka y 1 panel Kafka-UI, configurados con Healthchecks para asegurar un orden de arranque determinista (Config Server → Discovery Server → Microservicios).
-
-- **OAuth 2.0 Resource Server**: Los microservicios de negocio ahora validan los roles del usuario implementando el estándar OAuth 2.0 de Spring Security, mediante un `JwtAuthenticationConverter` personalizado (`RolesClaimJwtAuthenticationConverter`).
-
-
-### Módulos Maven
-
-| Módulo | Puerto | Rol |
-|---|---|---|
-| `common-lib` | — | DTOs compartidos y converter de roles JWT (no es una app Spring Boot) |
-| `config-server` | 8888 | Config Server centralizado |
-| `discovery-server` | 8761 | Eureka |
-| `auth-service` | 8081 | Emisión/validación de JWT |
-| `transacciones-service` | 8082 | Migración + API de `transacciones.csv` |
-| `intereses-service` | 8083 | Migración + API de `intereses.csv` |
-| `cuentas-service` | 8084 | Migración + API de `cuentas_anuales.csv` |
-
-
-### Datos de origen
+## 💾 Datos de origen
 
 Cada microservicio de negocio migra su CSV desde `data/semana_3/` (copiado a `src/main/resources/data/` de cada módulo para no depender de rutas externas) hacia una base H2 en memoria propia (patrón *database per service*), usando un job de Spring Batch con políticas de skip para los problemas típicos de datos legacy:
 
@@ -65,20 +78,7 @@ Cada microservicio de negocio migra su CSV desde `data/semana_3/` (copiado a `sr
 Las filas inválidas se omiten (skip) vía Spring Batch (`faultTolerant().skip(...)`) y quedan registradas en el log y en el contador de migración de cada servicio (`GET /api/migracion/status`).
 
 
-## Arquitectura de eventos (Kafka)
-
-Las escrituras entre servicios usan una **saga coreografiada sobre Kafka**: `POST /api/transacciones` (transacciones-service) → `transaccion.registrada` → cuentas-service → `cuenta.movimiento-aplicado` → intereses-service → `interes.recalculado` → transacción `CONFIRMADA`. Los fallos usan reintentos, Dead Letter Topics y compensación (`transaccion.fallida`). Diagrama, tópicos y pruebas en [docs/arquitectura-eventos.md](docs/arquitectura-eventos.md). Requiere `docker compose up -d` (Kafka en `localhost:9092`).
-
-
-## Requisitos
-
-- Docker y Docker Compose.
-- Java 17
-- Maven 3.9+
-- Puertos libres: `8761`, `8888`, `8081`, `8082`, `8083`, `8084`, `9092`, `8090`.
-
-
-## Cómo levantar el proyecto en Docker
+## Instrucciones para compilar y ejecutar:
 
 ### 1. Compilar los artefactos Java
 Desde la raíz del proyecto, ejecuta Maven para generar los `.jar` que Docker utilizará:
@@ -98,10 +98,10 @@ docker compose up -d --build
 
 
 ### 3. Verificar el estado
-Abre en tu navegador http://localhost:8761. Deberás ver los 4 microservicios (`AUTH-SERVICE`, `CUENTAS-SERVICE`, `INTERESES-SERVICE`y `TRANSACCIONES-SERVICE`) registrados en estado `UP`.
+Abre en tu navegador http://localhost:8761. Deberás ver los 5 microservicios (`AUTH-SERVICE`, `BFF-SERVICE`, `CUENTAS-SERVICE`, `INTERESES-SERVICE`y `TRANSACCIONES-SERVICE`) registrados en estado `UP`.
 
 
-## Pruebas de Seguridad (OAuth 2.0)
+## Pruebas de Seguridad (OAuth 2.0) y Endpoints del BFF
 
 Usuarios de demostración (en memoria en `auth-service`):
 
@@ -110,63 +110,19 @@ Usuarios de demostración (en memoria en `auth-service`):
 | `admin` | `admin123` | `ADMIN`, `USER` |
 | `user` | `user123` | `USER` |
 
+### Ejemplo de uso del Patrón BFF (Canales):
 ```bash
-# Login: Obtener Token JWT (auth-service)
+# 1. Obtener Token JWT desde auth-service
 TOKEN=$(curl -s -X POST http://localhost:8081/auth/login \
   -H 'Content-Type: application/json' \
   -d '{"username":"user","password":"user123"}' | python3 -c "import sys,json;print(json.load(sys.stdin)['token'])")
 
-# Prueba de acceso Autorizado (Código 200 OK)
-curl -i -H "Authorization: Bearer $TOKEN" http://localhost:8082/api/transacciones
+# 2. Consultar canal Web (Datos agregados de Cuentas, Intereses y Transacciones)
+curl -i -H "Authorization: Bearer $TOKEN" http://localhost:8085/api/bff/web/cuenta/101
 
-# Prueba de acceso Denegado (Código 401 Unauthorized)
-curl -i http://localhost:8082/api/transacciones
+# 3. Consultar canal Móvil (Respuesta ligera y optimizada)
+curl -i -H "Authorization: Bearer $TOKEN" http://localhost:8085/api/bff/movil/cuenta/101
 
-# Endpoint solo ADMIN con usuario USER -> 403
-curl -i -X POST -H "Authorization: Bearer $TOKEN" http://localhost:8082/api/migracion/rerun
+# 4. Consultar canal Cajero Automático / ATM (Operación rápida)
+curl -i -H "Authorization: Bearer $TOKEN" http://localhost:8085/api/bff/cajero/cuenta/101
 ```
-
-
-## Referencia de endpoints
-
-### auth-service (8081)
-
-| Método | Ruta | Auth | Descripción |
-|---|---|---|---|
-| POST | `/auth/login` | pública | Devuelve `{token, tokenType, expiresInMs}` |
-| GET | `/auth/me` | JWT | Usuario y roles del token actual |
-
-### transacciones-service (8082) / intereses-service (8083) / cuentas-service (8084)
-
-| Método | Ruta | Auth | Descripción |
-|---|---|---|---|
-| GET | `/api/<recurso>` | JWT | Listado paginado de los datos migrados |
-| GET | `/api/<recurso>/{id}` | JWT | Registro por id interno |
-| GET | `/api/migracion/status` | JWT | Contadores `leidos/escritos/omitidos` |
-| POST | `/api/migracion/rerun` | JWT + `ADMIN` | Re-ejecuta el job de migración |
-
-`<recurso>` es `transacciones`, `intereses` o `cuentas` según el servicio.
-
-### Endpoints adicionales de resumen y llamada cross-service:
-
-| Servicio | Ruta | Descripción |
-|---|---|---|
-| transacciones-service | `GET /api/transacciones/resumen-con-intereses/{cuentaId}` | Llama a `intereses-service` (Circuit Breaker + Retry + fallback) |
-| intereses-service | `GET /api/intereses/resumen/{cuentaId}` | Resumen propio (consumido por transacciones-service) |
-| intereses-service | `GET /api/intereses/resumen-con-cuenta/{cuentaId}` | Llama a `cuentas-service` (Circuit Breaker + Retry + fallback) |
-| cuentas-service | `GET /api/cuentas/resumen/{cuentaId}` | Resumen propio agregado (consumido por intereses-service) |
-| cuentas-service | `GET /api/cuentas/resumen-con-transaccion/{transaccionId}` | Llama a `transacciones-service` (Circuit Breaker + Retry + fallback) |
-
-
-## Stack técnico
-
-- Java 17, Maven multi-módulo
-- Spring Boot 3.3.13 / Spring Cloud 2023.0.6 ("Leyton")
-- Spring Cloud Config, Netflix Eureka, OpenFeign, LoadBalancer
-- Resilience4j 2.4.0 (Circuit Breaker, Retry)
-- Spring Security (OAuth2 Resource Server, JWT HS256 vía `jjwt` 0.13.0)
-- Spring Batch + Spring Data JPA + H2 (una base en memoria por servicio)
-
-## Datos legacy originales
-
-Los archivos en `data/` representan los distintos tipos de datos legacy usados en los procesos batch, organizados por semana (`semana_1`, `semana_2`, `semana_3`). Los microservicios usan `data/semana_3` (el dataset más completo) como fuente.
