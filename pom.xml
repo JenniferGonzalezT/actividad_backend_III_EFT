@@ -38,6 +38,7 @@
         <module>transacciones-service</module>
         <module>intereses-service</module>
         <module>cuentas-service</module>
+        <module>bff-service</module>
     </modules>
 
     <dependencyManagement>

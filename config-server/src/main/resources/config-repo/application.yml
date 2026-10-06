@@ -10,7 +10,7 @@ eureka:
 
 app:
   jwt:
-    secret: "banco-xyz-secreto-compartido-hs256-formativa-backend-semana-6-no-usar-en-produccion"
+    secret: "banco-xyz-secreto-compartido-hs256-actividad-backend-3-no-usar-en-produccion"
     expiration-ms: 3600000
 
 # Kafka: broker local (docker-compose.yml). Eventos serializados como JSON.
