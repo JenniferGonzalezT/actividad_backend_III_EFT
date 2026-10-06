@@ -1,6 +1,8 @@
 package com.bancoxyz.bff.web;
 
 import com.bancoxyz.bff.client.CuentasClient;
+import com.bancoxyz.bff.client.InteresesClient;
+import com.bancoxyz.bff.client.TransaccionesClient;
 import com.bancoxyz.common.dto.CuentaResumenDTO;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -14,22 +16,27 @@ import java.util.Map;
 @RequestMapping("/api/bff")
 public class BffController {
 
-    private final CuentasClient cuentasClient;
-
-    public BffController(CuentasClient cuentasClient) {
-        this.cuentasClient = cuentasClient;
-    }
+  private final CuentasClient cuentasClient;
+  private final InteresesClient interesesClient;
+  private final TransaccionesClient transaccionesClient;
+  
+  public BffController(CuentasClient cuentasClient, InteresesClient interesesClient, TransaccionesClient transaccionesClient) {
+      this.cuentasClient = cuentasClient;
+      this.interesesClient = interesesClient;
+      this.transaccionesClient = transaccionesClient;
+  }
 
     // 1. BFF WEB: Información detallada y completa para navegadores
     @GetMapping("/web/cuenta/{id}")
     public Map<String, Object> getCuentaParaWeb(@PathVariable Long id) {
-        CuentaResumenDTO cuenta = cuentasClient.obtenerResumenCuenta(id);
-        
+        var cuenta = cuentasClient.obtenerResumenCuenta(id);
+        var interes = interesesClient.obtenerResumenInteres(id);
+        var transaccion = transaccionesClient.obtenerResumenTransaccion(id);
+
         Map<String, Object> response = new HashMap<>();
-        response.put("cuentaId", cuenta.cuentaId());
-        response.put("totalMovimientos", cuenta.totalMovimientos());
-        response.put("montoTotal", cuenta.montoTotal());
-        response.put("fallback", cuenta.fallback());
+        response.put("cuenta", cuenta);
+        response.put("interes", interes);
+        response.put("transaccion_reciente", transaccion);
         response.put("canal", "Portal Web Completo");
         return response;
     }
