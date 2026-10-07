@@ -16,7 +16,13 @@ Los endpoints GET síncronos con Feign + Resilience4j se conservan (consultas). 
 
 ```mermaid
 flowchart LR
-    C([Cliente + JWT]) -- "POST /api/transacciones (202)" --> T
+    C([Cliente + JWT]) -- "Peticiones Web/Mobile" --> BFF
+
+    subgraph BS[bff-service :8085]
+        BFF[BffController]
+    end
+
+    BFF -- "POST /api/transacciones (202)" --> T
 
     subgraph TS[transacciones-service :8082]
         T[TransaccionService]
